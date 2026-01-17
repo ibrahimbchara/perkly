@@ -153,8 +153,12 @@ app.post("/api/recommend", async (req, res) => {
   }
 
   const aiPick = await pickWithGemini({ apiKey, model, user, cards: eligible });
-  if (!aiPick) {
-    res.json({ card: null, reason: "AI could not select a card. Try again in a moment." });
+  if (!aiPick || aiPick.error) {
+    const details = aiPick && aiPick.details ? ` ${aiPick.details}` : "";
+    res.json({
+      card: null,
+      reason: `AI could not select a card. ${aiPick && aiPick.error ? aiPick.error : "Try again in a moment."}${details}`,
+    });
     return;
   }
   if (aiPick.card_id === null) {

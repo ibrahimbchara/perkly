@@ -190,7 +190,7 @@ function safeJsonParse(text) {
 
 async function pickWithGemini({ apiKey, model, user, cards }) {
   if (!apiKey || !model || cards.length === 0) {
-    return null;
+    return { error: "AI is not configured or has no candidates." };
   }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
@@ -209,30 +209,50 @@ async function pickWithGemini({ apiKey, model, user, cards }) {
     },
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    return null;
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    return { error: "Could not reach Gemini API." };
   }
 
-  const data = await response.json();
-  const text =
+  const rawText = await response.text();
+  if (!response.ok) {
+    return {
+      error: `Gemini API error (${response.status}).`,
+      details: rawText.slice(0, 400),
+    };
+  }
+
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch (err) {
+    return { error: "Gemini response was not valid JSON.", details: rawText.slice(0, 400) };
+  }
+
+  const parts =
     data.candidates &&
     data.candidates[0] &&
     data.candidates[0].content &&
-    data.candidates[0].content.parts &&
-    data.candidates[0].content.parts[0] &&
-    data.candidates[0].content.parts[0].text;
+    data.candidates[0].content.parts
+      ? data.candidates[0].content.parts
+      : [];
 
-  const parsed = safeJsonParse(text || "");
-  if (!parsed || (!parsed.card_id && parsed.card_id !== null)) {
-    return null;
+  const text = parts.map((part) => part.text || "").join("").trim();
+  if (!text) {
+    return { error: "Gemini response was empty." };
+  }
+
+  const parsed = safeJsonParse(text);
+  if (!parsed || !Object.prototype.hasOwnProperty.call(parsed, "card_id")) {
+    return { error: "Could not parse Gemini output.", details: text.slice(0, 400) };
   }
   return parsed;
 }
