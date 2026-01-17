@@ -116,6 +116,7 @@ async function initDb() {
   );
   await ensureColumns();
   await backfillCalculationFields();
+  await autoFillEarnRules();
   await dbRun(
     `CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
@@ -163,6 +164,103 @@ async function backfillCalculationFields() {
         [rewardUnit, unitValue, extraFees, card.id]
       );
     }
+  }
+}
+
+function detectBucketsFromLine(line) {
+  const text = line.toLowerCase();
+  const buckets = new Set();
+  const addIf = (bucket, keywords) => {
+    if (keywords.some((keyword) => text.includes(keyword))) {
+      buckets.add(bucket);
+    }
+  };
+
+  addIf("travel", ["flight", "flights", "airline", "emirates", "etihad", "hotel", "travel", "emirates.com"]);
+  addIf("food_groceries", ["grocery", "groceries", "supermarket", "food", "restaurant", "qsr", "dining"]);
+  addIf("utilities", ["utilities", "telecommunication", "telecom"]);
+  addIf("fuel", ["fuel", "petroleum"]);
+  addIf("government", ["government"]);
+  addIf("real_estate", ["real estate"]);
+  addIf("transportation", ["transportation", "transport"]);
+  addIf("retail", ["retail", "online", "shopping"]);
+  addIf("foreign", ["foreign", "international", "usd", "overseas"]);
+
+  return Array.from(buckets);
+}
+
+function parseRateFromLine(line) {
+  const text = line.toLowerCase();
+  const cashbackMatch = text.match(/(\d+(?:\.\d+)?)\s*%[^\\n]*cashback|(\d+(?:\.\d+)?)\s*%[^\\n]*back/);
+  if (cashbackMatch) {
+    const pct = Number(cashbackMatch[1] || cashbackMatch[2]);
+    if (!Number.isNaN(pct)) {
+      return pct / 100;
+    }
+  }
+
+  const perAedMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:[a-z\\s]+)?per\\s*aed\\s*([0-9.]+)?/);
+  if (perAedMatch) {
+    const units = Number(perAedMatch[1]);
+    const denom = perAedMatch[2] ? Number(perAedMatch[2]) : 1;
+    if (!Number.isNaN(units) && !Number.isNaN(denom) && denom > 0) {
+      return units / denom;
+    }
+  }
+
+  const perUsdMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:[a-z\\s]+)?per\\s*usd/);
+  if (perUsdMatch) {
+    const units = Number(perUsdMatch[1]);
+    if (!Number.isNaN(units)) {
+      return units / 3.67;
+    }
+  }
+
+  return 0;
+}
+
+async function autoFillEarnRules() {
+  const rows = await dbAll(
+    "SELECT id, earn_rules_json, core_perks, secondary_perks, extra_perks, value_metric FROM cards"
+  );
+  for (const card of rows) {
+    if (normalizeText(card.earn_rules_json)) {
+      continue;
+    }
+    const combined = [card.core_perks, card.secondary_perks, card.extra_perks]
+      .filter(Boolean)
+      .join("\n");
+    const lines = combined.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    let defaultRate = 0;
+    const bucketRates = {};
+    for (const line of lines) {
+      const rate = parseRateFromLine(line);
+      if (!rate) {
+        continue;
+      }
+      const buckets = detectBucketsFromLine(line);
+      if (!buckets.length) {
+        defaultRate = Math.max(defaultRate, rate);
+      } else {
+        for (const bucket of buckets) {
+          bucketRates[bucket] = Math.max(bucketRates[bucket] || 0, rate);
+        }
+      }
+    }
+    if (!defaultRate && Object.keys(bucketRates).length) {
+      defaultRate = Math.max(...Object.values(bucketRates));
+    }
+    if (!defaultRate && !Object.keys(bucketRates).length) {
+      continue;
+    }
+    const rules = [];
+    if (defaultRate) {
+      rules.push({ bucket: "default", units_per_aed: Number(defaultRate.toFixed(6)) });
+    }
+    for (const [bucket, rate] of Object.entries(bucketRates)) {
+      rules.push({ bucket, units_per_aed: Number(rate.toFixed(6)) });
+    }
+    await dbRun("UPDATE cards SET earn_rules_json = ? WHERE id = ?", [JSON.stringify(rules), card.id]);
   }
 }
 
@@ -367,6 +465,23 @@ async function updateCardCalculationFields(data) {
   );
 }
 
+async function updateCardsCalculationByFilter(filters, data) {
+  let query = "SELECT id FROM cards WHERE 1=1";
+  const params = [];
+  for (const [key, value] of Object.entries(filters)) {
+    if (!value) {
+      continue;
+    }
+    query += ` AND ${key} = ?`;
+    params.push(value);
+  }
+  const rows = await dbAll(query, params);
+  for (const row of rows) {
+    await updateCardCalculationFields({ ...data, card_id: row.id });
+  }
+  return rows.length;
+}
+
 async function getSetting(key) {
   const row = await dbGet("SELECT value FROM settings WHERE key = ?", [key]);
   return row ? row.value : "";
@@ -394,6 +509,7 @@ module.exports = {
   getCards,
   insertCard,
   updateCardCalculationFields,
+  updateCardsCalculationByFilter,
   getSetting,
   setSetting,
   getSettings,
