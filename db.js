@@ -259,12 +259,8 @@ async function getSetting(key) {
 }
 
 async function setSetting(key, value) {
-  await dbRun(
-    `INSERT INTO settings (key, value)
-     VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    [key, value]
-  );
+  await dbRun("DELETE FROM settings WHERE key = ?", [key]);
+  await dbRun("INSERT INTO settings (key, value) VALUES (?, ?)", [key, value]);
 }
 
 async function getSettings() {

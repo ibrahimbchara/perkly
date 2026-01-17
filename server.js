@@ -27,10 +27,6 @@ async function boot() {
   await seedFromExcel();
 }
 
-boot().catch((err) => {
-  console.error("Failed to initialize:", err);
-});
-
 app.get("/", (req, res) => {
   res.render("index");
 });
@@ -195,6 +191,12 @@ app.post("/api/recommend", async (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Perkly running on http://localhost:${PORT}`);
-});
+boot()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Perkly running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to initialize:", err);
+  });
