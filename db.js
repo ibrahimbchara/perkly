@@ -115,6 +115,7 @@ async function initDb() {
     )`
   );
   await ensureColumns();
+  await backfillCalculationFields();
   await dbRun(
     `CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
@@ -135,6 +136,32 @@ async function ensureColumns() {
   for (const column of toAdd) {
     if (!existing.has(column.name)) {
       await dbRun(`ALTER TABLE cards ADD COLUMN ${column.name} ${column.type}`);
+    }
+  }
+}
+
+async function backfillCalculationFields() {
+  const cards = await dbAll(
+    "SELECT id, reward_unit, unit_value_aed, value_metric, value_calculation, extra_fees, mandatory_extra_fees_aed FROM cards"
+  );
+  for (const card of cards) {
+    const rewardUnit = normalizeText(card.reward_unit) || normalizeText(card.value_metric);
+    const unitValue = Number(card.unit_value_aed || 0) || parseUnitValue(card.value_calculation, card.value_metric);
+    const extraFees = Number(card.mandatory_extra_fees_aed || 0) || parseNumber(card.extra_fees);
+
+    if (
+      rewardUnit !== (card.reward_unit || "") ||
+      unitValue !== Number(card.unit_value_aed || 0) ||
+      extraFees !== Number(card.mandatory_extra_fees_aed || 0)
+    ) {
+      await dbRun(
+        `UPDATE cards
+         SET reward_unit = ?,
+             unit_value_aed = ?,
+             mandatory_extra_fees_aed = ?
+         WHERE id = ?`,
+        [rewardUnit, unitValue, extraFees, card.id]
+      );
     }
   }
 }
@@ -310,6 +337,25 @@ async function updateCardCalculationFields(data) {
   if (!cardId) {
     return;
   }
+  const existing = await dbGet(
+    "SELECT reward_unit, unit_value_aed, mandatory_extra_fees_aed, earn_rules_json FROM cards WHERE id = ?",
+    [cardId]
+  );
+  if (!existing) {
+    return;
+  }
+
+  const rewardUnit = normalizeText(data.reward_unit) || existing.reward_unit || "";
+  const unitValue =
+    data.unit_value_aed !== undefined && String(data.unit_value_aed).trim() !== ""
+      ? parseNumber(data.unit_value_aed)
+      : Number(existing.unit_value_aed || 0);
+  const mandatoryExtra =
+    data.mandatory_extra_fees_aed !== undefined && String(data.mandatory_extra_fees_aed).trim() !== ""
+      ? parseNumber(data.mandatory_extra_fees_aed)
+      : Number(existing.mandatory_extra_fees_aed || 0);
+  const earnRules = normalizeText(data.earn_rules_json) || existing.earn_rules_json || "";
+
   await dbRun(
     `UPDATE cards
      SET reward_unit = ?,
@@ -317,13 +363,7 @@ async function updateCardCalculationFields(data) {
          mandatory_extra_fees_aed = ?,
          earn_rules_json = ?
      WHERE id = ?`,
-    [
-      normalizeText(data.reward_unit),
-      parseNumber(data.unit_value_aed),
-      parseNumber(data.mandatory_extra_fees_aed),
-      normalizeText(data.earn_rules_json),
-      cardId,
-    ]
+    [rewardUnit, unitValue, mandatoryExtra, earnRules, cardId]
   );
 }
 

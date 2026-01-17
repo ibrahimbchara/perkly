@@ -358,7 +358,10 @@ function pickBestCardDeterministic({ cards, spend, requestedFeatures }) {
   }
 
   if (!evaluated.length) {
-    return { card: null, reason: "Cards are missing structured earn rules. Update them in admin." };
+    return {
+      card: null,
+      reason: "Cards are missing structured earn rules. Use the admin CSV import to add earn_rules_json.",
+    };
   }
 
   evaluated.sort((a, b) => b.breakdown.net_annual_value_aed - a.breakdown.net_annual_value_aed);

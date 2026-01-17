@@ -49,6 +49,25 @@
       </div>
 
       <div class="card-block">
+        <h2>Bulk update calculation fields</h2>
+        <p class="hint">Download the CSV, fill in reward unit, unit value, fees, and earn rules, then upload it.</p>
+        <div class="actions">
+          <a class="link" href="/admin/cards/export">Download calculation CSV</a>
+        </div>
+        <form class="admin-form" method="post" action="/admin/cards/import" enctype="multipart/form-data">
+          <div class="input-row full">
+            <label>Upload CSV</label>
+            <input type="file" name="cards_csv" accept=".csv" required />
+            <small class="hint">Required columns: card_id, reward_unit, unit_value_aed, mandatory_extra_fees_aed, earn_rules_json</small>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Upload CSV</button>
+          </div>
+        </form>
+        <p class="hint">Spend buckets used in earn rules: travel, retail, utilities, food_groceries, fuel, transportation, real_estate, foreign.</p>
+      </div>
+
+      <div class="card-block">
         <h2>Add a new card</h2>
         <form class="admin-form" method="post" action="/admin/cards">
           <div class="grid">

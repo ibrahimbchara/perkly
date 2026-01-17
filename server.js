@@ -1,5 +1,7 @@
 ﻿const express = require("express");
 const path = require("path");
+const multer = require("multer");
+const xlsx = require("xlsx");
 
 const {
   initDb,
@@ -15,6 +17,7 @@ const { pickBestCardDeterministic, buildExplanation } = require("./recommender")
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -51,6 +54,68 @@ app.post("/admin/cards", async (req, res) => {
 
 app.post("/admin/cards/update", async (req, res) => {
   await updateCardCalculationFields(req.body);
+  res.redirect("/admin");
+});
+
+app.get("/admin/cards/export", async (req, res) => {
+  const cards = await getCards({});
+  const rows = cards.map((card) => ({
+    card_id: card.id,
+    card_category: card.card_category,
+    sub_category: card.sub_category,
+    program: card.program,
+    bank_name: card.bank_name,
+    product: card.product,
+    reward_unit: card.reward_unit || card.value_metric || "",
+    unit_value_aed: card.unit_value_aed || "",
+    mandatory_extra_fees_aed: card.mandatory_extra_fees_aed || "",
+    earn_rules_json: card.earn_rules_json || "",
+  }));
+
+  const headers = [
+    "card_id",
+    "card_category",
+    "sub_category",
+    "program",
+    "bank_name",
+    "product",
+    "reward_unit",
+    "unit_value_aed",
+    "mandatory_extra_fees_aed",
+    "earn_rules_json",
+  ];
+
+  const worksheet = xlsx.utils.json_to_sheet(rows, { header: headers });
+  const csv = xlsx.utils.sheet_to_csv(worksheet);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=perkly_calculation_fields.csv");
+  res.send(csv);
+});
+
+app.post("/admin/cards/import", upload.single("cards_csv"), async (req, res) => {
+  if (!req.file) {
+    res.redirect("/admin");
+    return;
+  }
+  const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
+
+  for (const row of rows) {
+    const cardId = row.card_id || row.id;
+    if (!cardId) {
+      continue;
+    }
+    await updateCardCalculationFields({
+      card_id: cardId,
+      reward_unit: row.reward_unit,
+      unit_value_aed: row.unit_value_aed,
+      mandatory_extra_fees_aed: row.mandatory_extra_fees_aed,
+      earn_rules_json: row.earn_rules_json,
+    });
+  }
+
   res.redirect("/admin");
 });
 
