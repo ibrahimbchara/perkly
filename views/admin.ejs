@@ -24,7 +24,11 @@
               <label>Gemini API Key</label>
               <input type="password" name="gemini_api_key" placeholder="Leave blank to keep existing" />
               <small class="hint">
-                <%= settings.gemini_api_key ? "API key saved" : "No API key saved yet" %>
+                <% if (settings.gemini_api_key) { %>
+                  API key saved (ends with <%= settings.gemini_api_key.slice(-4) %>)
+                <% } else { %>
+                  No API key saved yet
+                <% } %>
               </small>
             </div>
             <div class="input-row">

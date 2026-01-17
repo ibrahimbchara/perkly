@@ -161,6 +161,7 @@ function buildPrompt(user, cards) {
     "If no card is a valid match, respond with card_id null and explain why.",
     "Return a single-line JSON object only (no markdown, no code fences) with this shape:",
     "{\"card_id\": number|null, \"reason\": \"short reason\"}",
+    "Reason must be under 120 characters and contain no line breaks.",
     "User profile:",
     JSON.stringify(user, null, 2),
     "Candidates:",
@@ -207,6 +208,35 @@ function normalizeJsonText(text) {
   return text.replace(/```json/gi, "").replace(/```/g, "").trim();
 }
 
+function salvageJson(text) {
+  if (!text) {
+    return null;
+  }
+  const normalized = normalizeJsonText(text);
+  const idMatch = normalized.match(/"card_id"\s*:\s*(null|\d+)/i);
+  if (!idMatch) {
+    return null;
+  }
+  const rawId = idMatch[1];
+  const cardId = rawId.toLowerCase() === "null" ? null : Number(rawId);
+  if (cardId !== null && Number.isNaN(cardId)) {
+    return null;
+  }
+
+  let reason = "";
+  const reasonMatch = normalized.match(/"reason"\s*:\s*"([\s\S]*?)"/i);
+  if (reasonMatch) {
+    reason = reasonMatch[1];
+  } else {
+    const startMatch = normalized.match(/"reason"\s*:\s*"([\s\S]*)$/i);
+    if (startMatch) {
+      reason = startMatch[1];
+    }
+  }
+  reason = reason.replace(/```/g, "").replace(/\s+/g, " ").trim();
+  return { card_id: cardId, reason };
+}
+
 function safeJsonParse(text) {
   if (!text) {
     return null;
@@ -218,13 +248,13 @@ function safeJsonParse(text) {
   } catch (err) {
     const match = trimmed.match(/\{[\s\S]*\}/);
     if (!match) {
-      return null;
+      return salvageJson(trimmed);
     }
     const candidate = sanitizeJsonString(match[0]);
     try {
       return JSON.parse(candidate);
     } catch (parseErr) {
-      return null;
+      return salvageJson(candidate);
     }
   }
 }
