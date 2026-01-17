@@ -282,10 +282,15 @@ function renderResult(cardData) {
 
   const highlight = document.createElement("div");
   highlight.className = "result-meta";
-  const reason = cardData.ai_reason
-    ? `AI notes: ${cardData.ai_reason}`
-    : "AI prioritized value based on your spend and preferences.";
-  highlight.textContent = reason;
+  if (cardData.breakdown) {
+    highlight.textContent = `Net annual value: AED ${cardData.breakdown.net_annual_value_aed} (fees AED ${cardData.breakdown.annual_fees_aed}).`;
+  } else {
+    highlight.textContent = cardData.explanation || "We picked the best value card based on your spend.";
+  }
+
+  const explanation = document.createElement("div");
+  explanation.className = "result-meta";
+  explanation.textContent = cardData.explanation || "";
 
   const actions = document.createElement("div");
   actions.className = "result-actions";
@@ -302,6 +307,9 @@ function renderResult(cardData) {
   wrapper.appendChild(badges);
   wrapper.appendChild(perks);
   wrapper.appendChild(highlight);
+  if (cardData.explanation) {
+    wrapper.appendChild(explanation);
+  }
   if (actions.children.length) {
     wrapper.appendChild(actions);
   }

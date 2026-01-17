@@ -77,12 +77,24 @@
               <input type="number" name="minimum_salary" min="0" />
             </div>
             <div class="input-row">
+              <label>Reward Unit</label>
+              <input type="text" name="reward_unit" placeholder="Skywards Miles" />
+            </div>
+            <div class="input-row">
+              <label>Unit Value (AED per unit)</label>
+              <input type="number" name="unit_value_aed" min="0" step="0.0001" />
+            </div>
+            <div class="input-row">
               <label>Annual Fee (AED)</label>
               <input type="number" name="annual_fee" min="0" />
             </div>
             <div class="input-row">
               <label>Joining Fee (AED)</label>
               <input type="number" name="joining_fee" min="0" />
+            </div>
+            <div class="input-row">
+              <label>Mandatory Extra Fees (AED)</label>
+              <input type="number" name="mandatory_extra_fees_aed" min="0" />
             </div>
             <div class="input-row">
               <label>Value Metric</label>
@@ -115,6 +127,14 @@
             <textarea name="extra_fees" rows="2"></textarea>
           </div>
           <div class="input-row full">
+            <label>Earn Rules JSON</label>
+            <textarea
+              name="earn_rules_json"
+              rows="4"
+              placeholder='[{"bucket":"travel","units_per_aed":0.4},{"bucket":"food_groceries","units_per_aed":0.1},{"bucket":"default","units_per_aed":0.2}]'
+            ></textarea>
+          </div>
+          <div class="input-row full">
             <label>Core Perks</label>
             <textarea name="core_perks" rows="4"></textarea>
           </div>
@@ -138,11 +158,47 @@
       </div>
 
       <div class="card-block">
+        <h2>Update card calculation fields</h2>
+        <form class="admin-form" method="post" action="/admin/cards/update">
+          <div class="grid">
+            <div class="input-row">
+              <label>Card ID</label>
+              <input type="number" name="card_id" min="1" required />
+            </div>
+            <div class="input-row">
+              <label>Reward Unit</label>
+              <input type="text" name="reward_unit" placeholder="Skywards Miles" />
+            </div>
+            <div class="input-row">
+              <label>Unit Value (AED per unit)</label>
+              <input type="number" name="unit_value_aed" min="0" step="0.0001" />
+            </div>
+            <div class="input-row">
+              <label>Mandatory Extra Fees (AED)</label>
+              <input type="number" name="mandatory_extra_fees_aed" min="0" />
+            </div>
+          </div>
+          <div class="input-row full">
+            <label>Earn Rules JSON</label>
+            <textarea
+              name="earn_rules_json"
+              rows="4"
+              placeholder='[{"bucket":"travel","units_per_aed":0.4},{"bucket":"food_groceries","units_per_aed":0.1},{"bucket":"default","units_per_aed":0.2}]'
+            ></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Update card</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card-block">
         <h2>Current catalog (<%= cards.length %>)</h2>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>ID</th>
                 <th>Category</th>
                 <th>Sub</th>
                 <th>Program</th>
@@ -155,6 +211,7 @@
             <tbody>
               <% cards.forEach(function(card) { %>
               <tr>
+                <td><%= card.id %></td>
                 <td><%= card.card_category %></td>
                 <td><%= card.sub_category %></td>
                 <td><%= card.program %></td>

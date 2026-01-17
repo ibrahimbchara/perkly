@@ -72,6 +72,18 @@ function parseNumber(value) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function parseUnitValue(value, metric) {
+  const fromValue = parseNumber(value);
+  if (fromValue > 0) {
+    return fromValue;
+  }
+  const metricText = normalizeText(metric).toLowerCase();
+  if (metricText.includes("cashback")) {
+    return 1;
+  }
+  return 0;
+}
+
 async function initDb() {
   await dbRun("PRAGMA foreign_keys = ON");
   await dbRun(
@@ -83,11 +95,14 @@ async function initDb() {
       bank_name TEXT,
       product TEXT,
       minimum_salary REAL,
+      reward_unit TEXT,
+      unit_value_aed REAL,
       value_metric TEXT,
       value_calculation TEXT,
       provider TEXT,
       annual_fee REAL,
       joining_fee REAL,
+      mandatory_extra_fees_aed REAL,
       extra_fees TEXT,
       core_perks TEXT,
       secondary_perks TEXT,
@@ -95,15 +110,33 @@ async function initDb() {
       card_type TEXT,
       current_offer TEXT,
       product_page TEXT,
-      old_notes TEXT
+      old_notes TEXT,
+      earn_rules_json TEXT
     )`
   );
+  await ensureColumns();
   await dbRun(
     `CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
     )`
   );
+}
+
+async function ensureColumns() {
+  const columns = await dbAll("PRAGMA table_info(cards)");
+  const existing = new Set(columns.map((col) => col.name));
+  const toAdd = [
+    { name: "reward_unit", type: "TEXT" },
+    { name: "unit_value_aed", type: "REAL" },
+    { name: "mandatory_extra_fees_aed", type: "REAL" },
+    { name: "earn_rules_json", type: "TEXT" },
+  ];
+  for (const column of toAdd) {
+    if (!existing.has(column.name)) {
+      await dbRun(`ALTER TABLE cards ADD COLUMN ${column.name} ${column.type}`);
+    }
+  }
 }
 
 async function seedFromExcel() {
@@ -130,6 +163,9 @@ async function seedFromExcel() {
       continue;
     }
 
+    const valueMetric = normalizeText(entry["Value Metric"]);
+    const valueCalculation = normalizeText(entry["Value Calculation"]);
+
     await dbRun(
       `INSERT INTO cards (
         card_category,
@@ -138,11 +174,14 @@ async function seedFromExcel() {
         bank_name,
         product,
         minimum_salary,
+        reward_unit,
+        unit_value_aed,
         value_metric,
         value_calculation,
         provider,
         annual_fee,
         joining_fee,
+        mandatory_extra_fees_aed,
         extra_fees,
         core_perks,
         secondary_perks,
@@ -150,8 +189,9 @@ async function seedFromExcel() {
         card_type,
         current_offer,
         product_page,
-        old_notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+        old_notes,
+        earn_rules_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
       [
         cardCategory,
         subCategory,
@@ -159,11 +199,14 @@ async function seedFromExcel() {
         normalizeText(entry["Bank Name"]),
         normalizeText(entry["Product"]),
         parseNumber(entry["Minimum Salary"]),
-        normalizeText(entry["Value Metric"]),
-        normalizeText(entry["Value Calculation"]),
+        valueMetric,
+        parseUnitValue(valueCalculation, valueMetric),
+        valueMetric,
+        valueCalculation,
         normalizeText(entry["Provider"]),
         parseNumber(entry["Annual Fee"]),
         parseNumber(entry["Joining Fee"]),
+        parseNumber(entry["Extra Fees"]),
         normalizeText(entry["Extra Fees"]),
         normalizeText(entry["Core Perks"]),
         normalizeText(entry["Secondary Perks"]),
@@ -172,6 +215,7 @@ async function seedFromExcel() {
         normalizeText(entry["Current Offer"]),
         normalizeText(entry["Product Page"]),
         normalizeText(entry["Old Notes"]),
+        "",
       ]
     );
   }
@@ -215,11 +259,14 @@ async function insertCard(data) {
       bank_name,
       product,
       minimum_salary,
+      reward_unit,
+      unit_value_aed,
       value_metric,
       value_calculation,
       provider,
       annual_fee,
       joining_fee,
+      mandatory_extra_fees_aed,
       extra_fees,
       core_perks,
       secondary_perks,
@@ -227,8 +274,9 @@ async function insertCard(data) {
       card_type,
       current_offer,
       product_page,
-      old_notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+      old_notes,
+      earn_rules_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
     [
       normalizeText(data.card_category),
       normalizeText(data.sub_category),
@@ -236,11 +284,14 @@ async function insertCard(data) {
       normalizeText(data.bank_name),
       normalizeText(data.product),
       parseNumber(data.minimum_salary),
+      normalizeText(data.reward_unit),
+      parseNumber(data.unit_value_aed),
       normalizeText(data.value_metric),
       normalizeText(data.value_calculation),
       normalizeText(data.provider),
       parseNumber(data.annual_fee),
       parseNumber(data.joining_fee),
+      parseNumber(data.mandatory_extra_fees_aed),
       normalizeText(data.extra_fees),
       normalizeText(data.core_perks),
       normalizeText(data.secondary_perks),
@@ -249,6 +300,29 @@ async function insertCard(data) {
       normalizeText(data.current_offer),
       normalizeText(data.product_page),
       normalizeText(data.old_notes),
+      normalizeText(data.earn_rules_json),
+    ]
+  );
+}
+
+async function updateCardCalculationFields(data) {
+  const cardId = Number(data.card_id || 0);
+  if (!cardId) {
+    return;
+  }
+  await dbRun(
+    `UPDATE cards
+     SET reward_unit = ?,
+         unit_value_aed = ?,
+         mandatory_extra_fees_aed = ?,
+         earn_rules_json = ?
+     WHERE id = ?`,
+    [
+      normalizeText(data.reward_unit),
+      parseNumber(data.unit_value_aed),
+      parseNumber(data.mandatory_extra_fees_aed),
+      normalizeText(data.earn_rules_json),
+      cardId,
     ]
   );
 }
@@ -279,6 +353,7 @@ module.exports = {
   fetchDistinct,
   getCards,
   insertCard,
+  updateCardCalculationFields,
   getSetting,
   setSetting,
   getSettings,

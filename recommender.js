@@ -259,6 +259,153 @@ function safeJsonParse(text) {
   }
 }
 
+function parseEarnRules(earnRulesJson) {
+  if (!earnRulesJson) {
+    return null;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(earnRulesJson);
+  } catch (err) {
+    return null;
+  }
+  const rules = Array.isArray(parsed) ? parsed : parsed.earn_rules;
+  if (!Array.isArray(rules)) {
+    return null;
+  }
+  let defaultRate = 0;
+  const buckets = {};
+  for (const rule of rules) {
+    if (!rule) {
+      continue;
+    }
+    const bucket = String(rule.bucket || rule.category || "").trim();
+    if (!bucket) {
+      continue;
+    }
+    let rate = Number(rule.units_per_aed);
+    if (!rate && rule.units_per_x_aed && rule.x_aed) {
+      rate = Number(rule.units_per_x_aed) / Number(rule.x_aed);
+    }
+    if (!rate || Number.isNaN(rate)) {
+      continue;
+    }
+    if (bucket === "default" || bucket === "all") {
+      defaultRate = rate;
+    } else {
+      buckets[bucket] = rate;
+    }
+  }
+  return { buckets, defaultRate };
+}
+
+function resolveUnitValue(card) {
+  const explicit = Number(card.unit_value_aed || 0);
+  if (explicit > 0) {
+    return explicit;
+  }
+  const metric = String(card.reward_unit || card.value_metric || "").toLowerCase();
+  if (metric.includes("cashback")) {
+    return 1;
+  }
+  return 0;
+}
+
+function computeCardValue(card, spend) {
+  const rules = parseEarnRules(card.earn_rules_json);
+  if (!rules) {
+    return null;
+  }
+  const unitValue = resolveUnitValue(card);
+  if (!unitValue) {
+    return null;
+  }
+  let monthlyUnits = 0;
+  for (const [bucket, amount] of Object.entries(spend)) {
+    const rate = rules.buckets[bucket] || rules.defaultRate || 0;
+    monthlyUnits += Number(amount || 0) * rate;
+  }
+  const annualUnits = monthlyUnits * 12;
+  const annualRewardValue = annualUnits * unitValue;
+  const annualFee = Number(card.annual_fee || 0);
+  const joiningFee = Number(card.joining_fee || 0);
+  const mandatoryFees = Number(card.mandatory_extra_fees_aed || 0);
+  const annualFees = annualFee + mandatoryFees;
+  const netAnnualValue = annualRewardValue - annualFees;
+  const netFirstYearValue = netAnnualValue - joiningFee;
+
+  return {
+    annual_units: Number(annualUnits.toFixed(2)),
+    unit_value_aed: unitValue,
+    annual_reward_value_aed: Number(annualRewardValue.toFixed(2)),
+    annual_fees_aed: Number(annualFees.toFixed(2)),
+    joining_fee_aed: Number(joiningFee.toFixed(2)),
+    net_annual_value_aed: Number(netAnnualValue.toFixed(2)),
+    net_first_year_value_aed: Number(netFirstYearValue.toFixed(2)),
+  };
+}
+
+function pickBestCardDeterministic({ cards, spend, requestedFeatures }) {
+  const evaluated = [];
+  const skipped = [];
+  for (const card of cards) {
+    const breakdown = computeCardValue(card, spend);
+    if (!breakdown) {
+      skipped.push(card);
+      continue;
+    }
+    evaluated.push({ card, breakdown });
+  }
+
+  if (!evaluated.length) {
+    return { card: null, reason: "Cards are missing structured earn rules. Update them in admin." };
+  }
+
+  evaluated.sort((a, b) => b.breakdown.net_annual_value_aed - a.breakdown.net_annual_value_aed);
+  let winner = evaluated[0];
+
+  if (evaluated.length > 1) {
+    const second = evaluated[1];
+    const diff = Math.abs(winner.breakdown.net_annual_value_aed - second.breakdown.net_annual_value_aed);
+    if (diff <= 200) {
+      const requested = new Set((requestedFeatures || []).map((item) => item.toLowerCase()));
+      const score = (item) => {
+        const text = [item.card.core_perks, item.card.secondary_perks, item.card.extra_perks]
+          .filter(Boolean)
+          .join(" ");
+        const features = detectFeatures(text).map((feature) => feature.toLowerCase());
+        return features.filter((feature) => requested.has(feature)).length;
+      };
+      const winnerScore = score(winner);
+      const secondScore = score(second);
+      if (secondScore > winnerScore) {
+        winner = second;
+      } else if (secondScore === winnerScore) {
+        const winnerFee = Number(winner.card.annual_fee || 0);
+        const secondFee = Number(second.card.annual_fee || 0);
+        if (secondFee < winnerFee) {
+          winner = second;
+        } else if (secondFee === winnerFee) {
+          const winnerUnit = resolveUnitValue(winner.card);
+          const secondUnit = resolveUnitValue(second.card);
+          if (secondUnit > winnerUnit) {
+            winner = second;
+          }
+        }
+      }
+    }
+  }
+
+  return winner;
+}
+
+function buildExplanation(card, breakdown) {
+  if (!breakdown) {
+    return "We could not compute a full value breakdown for this card yet.";
+  }
+  return `Estimated annual rewards value: AED ${breakdown.annual_reward_value_aed}. Fees deducted: AED ${breakdown.annual_fees_aed}. Net annual value: AED ${breakdown.net_annual_value_aed}.`;
+}
+
 async function pickWithGemini({ apiKey, model, user, cards }) {
   if (!apiKey || !model || cards.length === 0) {
     return { error: "AI is not configured or has no candidates." };
@@ -343,4 +490,6 @@ module.exports = {
   selectWithHeuristics,
   pickWithGemini,
   detectFeatures,
+  pickBestCardDeterministic,
+  buildExplanation,
 };

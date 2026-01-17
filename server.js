@@ -9,8 +9,9 @@ const {
   insertCard,
   getSettings,
   setSetting,
+  updateCardCalculationFields,
 } = require("./db");
-const { pickWithGemini } = require("./recommender");
+const { pickBestCardDeterministic, buildExplanation } = require("./recommender");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -45,6 +46,11 @@ app.get("/admin", async (req, res) => {
 
 app.post("/admin/cards", async (req, res) => {
   await insertCard(req.body);
+  res.redirect("/admin");
+});
+
+app.post("/admin/cards/update", async (req, res) => {
+  await updateCardCalculationFields(req.body);
   res.redirect("/admin");
 });
 
@@ -129,44 +135,19 @@ app.post("/api/recommend", async (req, res) => {
     return;
   }
 
-  const settings = await getSettings();
-  const apiKey = settings.gemini_api_key || "";
-  const model = settings.gemini_model || "";
-
-  const user = {
-    category,
-    sub_category: subCategory,
-    program,
-    monthly_income: income,
-    annual_fee_ok: annualFeeOk,
+  const result = pickBestCardDeterministic({
+    cards: eligible,
     spend: spendValues,
-    requested_features: features,
-  };
+    requestedFeatures: features,
+  });
 
-  if (!apiKey || !model) {
-    res.json({ card: null, reason: "AI is not configured yet. Add a Gemini API key and model." });
-    return;
-  }
-
-  const aiPick = await pickWithGemini({ apiKey, model, user, cards: eligible });
-  if (!aiPick || aiPick.error) {
-    const details = aiPick && aiPick.details ? ` ${aiPick.details}` : "";
-    res.json({
-      card: null,
-      reason: `AI could not select a card. ${aiPick && aiPick.error ? aiPick.error : "Try again in a moment."}${details}`,
-    });
-    return;
-  }
-  if (aiPick.card_id === null) {
-    res.json({ card: null, reason: aiPick.reason || "No card matches your criteria." });
+  if (!result || !result.card) {
+    res.json({ card: null, reason: result && result.reason ? result.reason : "No card matches your criteria." });
     return;
   }
 
-  const card = eligible.find((item) => Number(item.id) === Number(aiPick.card_id));
-  if (!card) {
-    res.json({ card: null, reason: "AI selected a card that is not available in this list." });
-    return;
-  }
+  const card = result.card;
+  const breakdown = result.breakdown;
 
   res.json({
     card: {
@@ -187,7 +168,8 @@ app.post("/api/recommend", async (req, res) => {
       current_offer: card.current_offer,
       product_page: card.product_page,
     },
-    ai_reason: aiPick.reason || "",
+    breakdown,
+    explanation: buildExplanation(card, breakdown),
   });
 });
 
