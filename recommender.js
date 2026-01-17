@@ -159,7 +159,7 @@ function buildPrompt(user, cards) {
     "Choose the single best card for the user based only on the candidate list provided.",
     "Prioritize monetary value return for the user's spending and honor requested features when possible.",
     "If no card is a valid match, respond with card_id null and explain why.",
-    "Return JSON only with this shape:",
+    "Return a single-line JSON object only (no markdown, no code fences) with this shape:",
     "{\"card_id\": number|null, \"reason\": \"short reason\"}",
     "User profile:",
     JSON.stringify(user, null, 2),
@@ -168,11 +168,51 @@ function buildPrompt(user, cards) {
   ].join("\n");
 }
 
+function sanitizeJsonString(raw) {
+  if (!raw) {
+    return "";
+  }
+  let output = "";
+  let inString = false;
+  let escape = false;
+  for (const char of raw) {
+    if (escape) {
+      output += char;
+      escape = false;
+      continue;
+    }
+    if (char === "\\" && inString) {
+      output += char;
+      escape = true;
+      continue;
+    }
+    if (char === "\"") {
+      inString = !inString;
+      output += char;
+      continue;
+    }
+    if (inString && (char === "\n" || char === "\r")) {
+      output += " ";
+      continue;
+    }
+    output += char;
+  }
+  return output;
+}
+
+function normalizeJsonText(text) {
+  if (!text) {
+    return "";
+  }
+  return text.replace(/```json/gi, "").replace(/```/g, "").trim();
+}
+
 function safeJsonParse(text) {
   if (!text) {
     return null;
   }
-  const trimmed = text.trim();
+  const normalized = normalizeJsonText(text);
+  const trimmed = normalized.trim();
   try {
     return JSON.parse(trimmed);
   } catch (err) {
@@ -180,8 +220,9 @@ function safeJsonParse(text) {
     if (!match) {
       return null;
     }
+    const candidate = sanitizeJsonString(match[0]);
     try {
-      return JSON.parse(match[0]);
+      return JSON.parse(candidate);
     } catch (parseErr) {
       return null;
     }
