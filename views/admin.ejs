@@ -70,6 +70,7 @@
                 <th>Product</th>
                 <th>Min Salary</th>
                 <th>Annual Fee</th>
+                <th>Mandatory Extra Fees</th>
               </tr>
             </thead>
             <tbody>
@@ -84,11 +85,12 @@
                   <td><%= card.product %></td>
                   <td><%= card.minimum_salary %></td>
                   <td><%= card.annual_fee %></td>
+                  <td><%= card.mandatory_extra_fees_aed || 0 %></td>
                 </tr>
                 <% }); %>
               <% } else { %>
                 <tr>
-                  <td colspan="8">No cards available.</td>
+                  <td colspan="9">No cards available.</td>
                 </tr>
               <% } %>
             </tbody>
