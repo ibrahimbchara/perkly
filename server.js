@@ -9,6 +9,7 @@ const {
   fetchDistinct,
   getCards,
   replaceCardsFromExcelRows,
+  deleteCardById,
 } = require("./db");
 const { pickBestCardDeterministic, buildExplanation } = require("./recommender");
 
@@ -33,7 +34,8 @@ app.get("/", (req, res) => {
 });
 
 app.get("/admin", async (req, res) => {
-  res.render("admin");
+  const cards = await getCards({});
+  res.render("admin", { cards });
 });
 
 app.get("/admin/cards/export-excel", async (req, res) => {
@@ -112,6 +114,11 @@ app.post("/admin/cards/import-excel", upload.single("cards_excel"), async (req, 
   const sheet = workbook.Sheets[sheetName];
   const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
   await replaceCardsFromExcelRows(rows);
+  res.redirect("/admin");
+});
+
+app.post("/admin/cards/delete", async (req, res) => {
+  await deleteCardById(req.body.card_id);
   res.redirect("/admin");
 });
 

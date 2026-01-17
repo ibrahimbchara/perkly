@@ -524,6 +524,14 @@ async function updateCardsCalculationByFilter(filters, data) {
   return rows.length;
 }
 
+async function deleteCardById(cardId) {
+  const id = Number(cardId || 0);
+  if (!id) {
+    return;
+  }
+  await dbRun("DELETE FROM cards WHERE id = ?", [id]);
+}
+
 async function getSetting(key) {
   const row = await dbGet("SELECT value FROM settings WHERE key = ?", [key]);
   return row ? row.value : "";
@@ -553,6 +561,7 @@ module.exports = {
   updateCardCalculationFields,
   updateCardsCalculationByFilter,
   replaceCardsFromExcelRows,
+  deleteCardById,
   getSetting,
   setSetting,
   getSettings,

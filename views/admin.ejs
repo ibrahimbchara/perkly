@@ -39,6 +39,62 @@
         <p class="hint">Upload replaces the full card database. Keep column names unchanged.</p>
         <p class="hint">Spend buckets used in Earn Rules JSON: travel, retail, utilities, food_groceries, fuel, transportation, real_estate, foreign.</p>
       </div>
+
+      <div class="card-block">
+        <h2>Delete a card</h2>
+        <form class="admin-form" method="post" action="/admin/cards/delete">
+          <div class="grid">
+            <div class="input-row">
+              <label>Card ID</label>
+              <input type="number" name="card_id" min="1" required />
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Delete card</button>
+          </div>
+        </form>
+        <p class="hint">For edits, download the Excel, update the row, and upload it again.</p>
+      </div>
+
+      <div class="card-block">
+        <h2>Current cards (<%= cards ? cards.length : 0 %>)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Category</th>
+                <th>Sub</th>
+                <th>Program</th>
+                <th>Bank</th>
+                <th>Product</th>
+                <th>Min Salary</th>
+                <th>Annual Fee</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (cards && cards.length) { %>
+                <% cards.forEach(function(card) { %>
+                <tr>
+                  <td><%= card.id %></td>
+                  <td><%= card.card_category %></td>
+                  <td><%= card.sub_category %></td>
+                  <td><%= card.program %></td>
+                  <td><%= card.bank_name %></td>
+                  <td><%= card.product %></td>
+                  <td><%= card.minimum_salary %></td>
+                  <td><%= card.annual_fee %></td>
+                </tr>
+                <% }); %>
+              <% } else { %>
+                <tr>
+                  <td colspan="8">No cards available.</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </main>
 </body>
