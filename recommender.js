@@ -360,7 +360,7 @@ function pickBestCardDeterministic({ cards, spend, requestedFeatures }) {
   if (!evaluated.length) {
     return {
       card: null,
-      reason: "Cards are missing structured earn rules. Use the admin CSV import to add earn_rules_json.",
+      reason: "Cards are missing structured earn rules. Upload the Excel template with earn_rules_json filled in.",
     };
   }
 

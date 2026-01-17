@@ -8,11 +8,7 @@ const {
   seedFromExcel,
   fetchDistinct,
   getCards,
-  insertCard,
-  getSettings,
-  setSetting,
-  updateCardCalculationFields,
-  updateCardsCalculationByFilter,
+  replaceCardsFromExcelRows,
 } = require("./db");
 const { pickBestCardDeterministic, buildExplanation } = require("./recommender");
 
@@ -37,137 +33,73 @@ app.get("/", (req, res) => {
 });
 
 app.get("/admin", async (req, res) => {
-  const cards = await getCards({});
-  const settings = await getSettings();
-  res.render("admin", {
-    cards,
-    settings: {
-      gemini_api_key: settings.gemini_api_key || "",
-      gemini_model: settings.gemini_model || "",
-    },
-  });
+  res.render("admin");
 });
 
-app.post("/admin/cards", async (req, res) => {
-  await insertCard(req.body);
-  res.redirect("/admin");
-});
-
-app.post("/admin/cards/update", async (req, res) => {
-  await updateCardCalculationFields(req.body);
-  res.redirect("/admin");
-});
-
-app.post("/admin/cards/rules", async (req, res) => {
-  const cardId = (req.body.card_id || "").trim();
-  const filters = {
-    card_category: (req.body.card_category || "").trim(),
-    sub_category: (req.body.sub_category || "").trim(),
-    program: (req.body.program || "").trim(),
-  };
-  const rewardUnit = (req.body.reward_unit || "").trim();
-  const unitValue = req.body.unit_value_aed;
-  const mandatoryExtra = req.body.mandatory_extra_fees_aed;
-
-  const buckets = [
-    "default",
-    "travel",
-    "retail",
-    "utilities",
-    "food_groceries",
-    "fuel",
-    "transportation",
-    "real_estate",
-    "foreign",
-  ];
-  const rules = [];
-  for (const bucket of buckets) {
-    const value = req.body[`rate_${bucket}`];
-    if (value === undefined || String(value).trim() === "") {
-      continue;
-    }
-    const rate = Number(value);
-    if (!Number.isNaN(rate) && rate > 0) {
-      rules.push({ bucket, units_per_aed: rate });
-    }
-  }
-
-  const payload = {
-    reward_unit: rewardUnit,
-    unit_value_aed: unitValue,
-    mandatory_extra_fees_aed: mandatoryExtra,
-    earn_rules_json: rules.length ? JSON.stringify(rules) : "",
-  };
-
-  if (cardId) {
-    await updateCardCalculationFields({ ...payload, card_id: cardId });
-  } else {
-    await updateCardsCalculationByFilter(filters, payload);
-  }
-
-  res.redirect("/admin");
-});
-
-app.get("/admin/cards/export", async (req, res) => {
+app.get("/admin/cards/export-excel", async (req, res) => {
   const cards = await getCards({});
   const rows = cards.map((card) => ({
-    card_id: card.id,
-    card_category: card.card_category,
-    sub_category: card.sub_category,
-    program: card.program,
-    bank_name: card.bank_name,
-    product: card.product,
-    reward_unit: card.reward_unit || card.value_metric || "",
-    unit_value_aed: card.unit_value_aed || "",
-    mandatory_extra_fees_aed: card.mandatory_extra_fees_aed || "",
-    earn_rules_json: card.earn_rules_json || "",
+    "Card Category": card.card_category,
+    "Sub Category": card.sub_category,
+    Program: card.program,
+    "Bank Name": card.bank_name,
+    Product: card.product,
+    "Minimum Salary": card.minimum_salary,
+    "Reward Unit": card.reward_unit || card.value_metric || "",
+    "Unit Value (AED)": card.unit_value_aed || "",
+    "Value Metric": card.value_metric,
+    "Value Calculation": card.value_calculation,
+    Provider: card.provider,
+    "Annual Fee": card.annual_fee,
+    "Joining Fee": card.joining_fee,
+    "Mandatory Extra Fees (AED)": card.mandatory_extra_fees_aed || "",
+    "Extra Fees": card.extra_fees,
+    "Core Perks": card.core_perks,
+    "Secondary Perks": card.secondary_perks,
+    "Extra Perks": card.extra_perks,
+    "Card type": card.card_type,
+    "Current Offer": card.current_offer,
+    "Product Page": card.product_page,
+    "Old Notes": card.old_notes,
+    "Earn Rules JSON": card.earn_rules_json || "",
   }));
 
   const headers = [
-    "card_id",
-    "card_category",
-    "sub_category",
-    "program",
-    "bank_name",
-    "product",
-    "reward_unit",
-    "unit_value_aed",
-    "mandatory_extra_fees_aed",
-    "earn_rules_json",
+    "Card Category",
+    "Sub Category",
+    "Program",
+    "Bank Name",
+    "Product",
+    "Minimum Salary",
+    "Reward Unit",
+    "Unit Value (AED)",
+    "Value Metric",
+    "Value Calculation",
+    "Provider",
+    "Annual Fee",
+    "Joining Fee",
+    "Mandatory Extra Fees (AED)",
+    "Extra Fees",
+    "Core Perks",
+    "Secondary Perks",
+    "Extra Perks",
+    "Card type",
+    "Current Offer",
+    "Product Page",
+    "Old Notes",
+    "Earn Rules JSON",
   ];
 
   const worksheet = xlsx.utils.json_to_sheet(rows, { header: headers });
-  const csv = xlsx.utils.sheet_to_csv(worksheet);
-  res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", "attachment; filename=perkly_calculation_fields.csv");
-  res.send(csv);
-});
-
-app.post("/admin/cards/import", upload.single("cards_csv"), async (req, res) => {
-  if (!req.file) {
-    res.redirect("/admin");
-    return;
-  }
-  const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
-
-  for (const row of rows) {
-    const cardId = row.card_id || row.id;
-    if (!cardId) {
-      continue;
-    }
-    await updateCardCalculationFields({
-      card_id: cardId,
-      reward_unit: row.reward_unit,
-      unit_value_aed: row.unit_value_aed,
-      mandatory_extra_fees_aed: row.mandatory_extra_fees_aed,
-      earn_rules_json: row.earn_rules_json,
-    });
-  }
-
-  res.redirect("/admin");
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(workbook, worksheet, "Perkly Card Database");
+  const buffer = xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", "attachment; filename=perkly_cards.xlsx");
+  res.send(buffer);
 });
 
 app.post("/admin/cards/import-excel", upload.single("cards_excel"), async (req, res) => {
@@ -179,51 +111,7 @@ app.post("/admin/cards/import-excel", upload.single("cards_excel"), async (req, 
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
-
-  const cards = await getCards({});
-  const map = new Map();
-  for (const card of cards) {
-    const key = `${(card.bank_name || "").toLowerCase()}|${(card.product || "").toLowerCase()}|${(card.program || "").toLowerCase()}|${(card.sub_category || "").toLowerCase()}`;
-    map.set(key, card.id);
-  }
-
-  for (const row of rows) {
-    const cardId = row.card_id || row.id;
-    let targetId = cardId;
-    if (!targetId) {
-      const key = `${String(row["Bank Name"] || row.bank_name || "").toLowerCase()}|${String(
-        row["Product"] || row.product || ""
-      ).toLowerCase()}|${String(row["Program"] || row.program || "").toLowerCase()}|${String(
-        row["Sub Category"] || row.sub_category || ""
-      ).toLowerCase()}`;
-      targetId = map.get(key);
-    }
-    if (!targetId) {
-      continue;
-    }
-    await updateCardCalculationFields({
-      card_id: targetId,
-      reward_unit: row.reward_unit || row["Reward Unit"],
-      unit_value_aed: row.unit_value_aed || row["Unit Value (AED)"] || row["Unit Value"],
-      mandatory_extra_fees_aed: row.mandatory_extra_fees_aed || row["Mandatory Extra Fees (AED)"],
-      earn_rules_json: row.earn_rules_json || row["Earn Rules JSON"],
-    });
-  }
-
-  res.redirect("/admin");
-});
-
-app.post("/admin/settings", async (req, res) => {
-  const apiKey = (req.body.gemini_api_key || "").trim();
-  const model = (req.body.gemini_model || "").trim();
-
-  if (apiKey) {
-    await setSetting("gemini_api_key", apiKey);
-  }
-  if (model) {
-    await setSetting("gemini_model", model);
-  }
-
+  await replaceCardsFromExcelRows(rows);
   res.redirect("/admin");
 });
 

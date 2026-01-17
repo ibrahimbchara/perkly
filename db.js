@@ -84,6 +84,113 @@ function parseUnitValue(value, metric) {
   return 0;
 }
 
+function buildCardFromExcelRow(entry) {
+  const cardCategory = normalizeText(entry["Card Category"]);
+  if (!cardCategory || cardCategory === "Card Category") {
+    return null;
+  }
+  const subCategory = normalizeText(entry["Sub Category"]);
+  if (subCategory === "Sub Category") {
+    return null;
+  }
+
+  const valueMetric = normalizeText(entry["Value Metric"]);
+  const valueCalculation = normalizeText(entry["Value Calculation"]);
+
+  const rewardUnit = normalizeText(entry["Reward Unit"]) || valueMetric;
+  const unitValue =
+    parseNumber(entry["Unit Value (AED)"]) ||
+    parseNumber(entry["Unit Value"]) ||
+    parseUnitValue(valueCalculation, valueMetric);
+  const mandatoryExtraFees =
+    parseNumber(entry["Mandatory Extra Fees (AED)"]) ||
+    parseNumber(entry["Mandatory Extra Fees"]) ||
+    parseNumber(entry["Extra Fees"]);
+  const earnRules =
+    normalizeText(entry["Earn Rules JSON"]) || normalizeText(entry["earn_rules_json"]) || "";
+
+  return {
+    card_category: cardCategory,
+    sub_category: subCategory,
+    program: normalizeText(entry["Program"]),
+    bank_name: normalizeText(entry["Bank Name"]),
+    product: normalizeText(entry["Product"]),
+    minimum_salary: parseNumber(entry["Minimum Salary"]),
+    reward_unit: rewardUnit,
+    unit_value_aed: unitValue,
+    value_metric: valueMetric,
+    value_calculation: valueCalculation,
+    provider: normalizeText(entry["Provider"]),
+    annual_fee: parseNumber(entry["Annual Fee"]),
+    joining_fee: parseNumber(entry["Joining Fee"]),
+    mandatory_extra_fees_aed: mandatoryExtraFees,
+    extra_fees: normalizeText(entry["Extra Fees"]),
+    core_perks: normalizeText(entry["Core Perks"]),
+    secondary_perks: normalizeText(entry["Secondary Perks"]),
+    extra_perks: normalizeText(entry["Extra Perks"]),
+    card_type: normalizeText(entry["Card type"]),
+    current_offer: normalizeText(entry["Current Offer"]),
+    product_page: normalizeText(entry["Product Page"]),
+    old_notes: normalizeText(entry["Old Notes"]),
+    earn_rules_json: earnRules,
+  };
+}
+
+async function insertCardRecord(card) {
+  await dbRun(
+    `INSERT INTO cards (
+      card_category,
+      sub_category,
+      program,
+      bank_name,
+      product,
+      minimum_salary,
+      reward_unit,
+      unit_value_aed,
+      value_metric,
+      value_calculation,
+      provider,
+      annual_fee,
+      joining_fee,
+      mandatory_extra_fees_aed,
+      extra_fees,
+      core_perks,
+      secondary_perks,
+      extra_perks,
+      card_type,
+      current_offer,
+      product_page,
+      old_notes,
+      earn_rules_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      card.card_category,
+      card.sub_category,
+      card.program,
+      card.bank_name,
+      card.product,
+      card.minimum_salary,
+      card.reward_unit,
+      card.unit_value_aed,
+      card.value_metric,
+      card.value_calculation,
+      card.provider,
+      card.annual_fee,
+      card.joining_fee,
+      card.mandatory_extra_fees_aed,
+      card.extra_fees,
+      card.core_perks,
+      card.secondary_perks,
+      card.extra_perks,
+      card.card_type,
+      card.current_offer,
+      card.product_page,
+      card.old_notes,
+      card.earn_rules_json,
+    ]
+  );
+}
+
 async function initDb() {
   await dbRun("PRAGMA foreign_keys = ON");
   await dbRun(
@@ -279,70 +386,11 @@ async function seedFromExcel() {
   const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
   for (const entry of rows) {
-    const cardCategory = normalizeText(entry["Card Category"]);
-    if (!cardCategory || cardCategory === "Card Category") {
+    const card = buildCardFromExcelRow(entry);
+    if (!card) {
       continue;
     }
-    const subCategory = normalizeText(entry["Sub Category"]);
-    if (subCategory === "Sub Category") {
-      continue;
-    }
-
-    const valueMetric = normalizeText(entry["Value Metric"]);
-    const valueCalculation = normalizeText(entry["Value Calculation"]);
-
-    await dbRun(
-      `INSERT INTO cards (
-        card_category,
-        sub_category,
-        program,
-        bank_name,
-        product,
-        minimum_salary,
-        reward_unit,
-        unit_value_aed,
-        value_metric,
-        value_calculation,
-        provider,
-        annual_fee,
-        joining_fee,
-        mandatory_extra_fees_aed,
-        extra_fees,
-        core_perks,
-        secondary_perks,
-        extra_perks,
-        card_type,
-        current_offer,
-        product_page,
-        old_notes,
-        earn_rules_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
-      [
-        cardCategory,
-        subCategory,
-        normalizeText(entry["Program"]),
-        normalizeText(entry["Bank Name"]),
-        normalizeText(entry["Product"]),
-        parseNumber(entry["Minimum Salary"]),
-        valueMetric,
-        parseUnitValue(valueCalculation, valueMetric),
-        valueMetric,
-        valueCalculation,
-        normalizeText(entry["Provider"]),
-        parseNumber(entry["Annual Fee"]),
-        parseNumber(entry["Joining Fee"]),
-        parseNumber(entry["Extra Fees"]),
-        normalizeText(entry["Extra Fees"]),
-        normalizeText(entry["Core Perks"]),
-        normalizeText(entry["Secondary Perks"]),
-        normalizeText(entry["Extra Perks"]),
-        normalizeText(entry["Card type"]),
-        normalizeText(entry["Current Offer"]),
-        normalizeText(entry["Product Page"]),
-        normalizeText(entry["Old Notes"]),
-        "",
-      ]
-    );
+    await insertCardRecord(card);
   }
 }
 
@@ -376,58 +424,52 @@ async function getCards(filters = {}) {
 }
 
 async function insertCard(data) {
-  await dbRun(
-    `INSERT INTO cards (
-      card_category,
-      sub_category,
-      program,
-      bank_name,
-      product,
-      minimum_salary,
-      reward_unit,
-      unit_value_aed,
-      value_metric,
-      value_calculation,
-      provider,
-      annual_fee,
-      joining_fee,
-      mandatory_extra_fees_aed,
-      extra_fees,
-      core_perks,
-      secondary_perks,
-      extra_perks,
-      card_type,
-      current_offer,
-      product_page,
-      old_notes,
-      earn_rules_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
-    [
-      normalizeText(data.card_category),
-      normalizeText(data.sub_category),
-      normalizeText(data.program),
-      normalizeText(data.bank_name),
-      normalizeText(data.product),
-      parseNumber(data.minimum_salary),
-      normalizeText(data.reward_unit),
-      parseNumber(data.unit_value_aed),
-      normalizeText(data.value_metric),
-      normalizeText(data.value_calculation),
-      normalizeText(data.provider),
-      parseNumber(data.annual_fee),
-      parseNumber(data.joining_fee),
-      parseNumber(data.mandatory_extra_fees_aed),
-      normalizeText(data.extra_fees),
-      normalizeText(data.core_perks),
-      normalizeText(data.secondary_perks),
-      normalizeText(data.extra_perks),
-      normalizeText(data.card_type),
-      normalizeText(data.current_offer),
-      normalizeText(data.product_page),
-      normalizeText(data.old_notes),
-      normalizeText(data.earn_rules_json),
-    ]
-  );
+  const valueMetric = normalizeText(data.value_metric);
+  const valueCalculation = normalizeText(data.value_calculation);
+  const rewardUnit = normalizeText(data.reward_unit) || valueMetric;
+  const unitValue = parseNumber(data.unit_value_aed) || parseUnitValue(valueCalculation, valueMetric);
+  const mandatoryExtra =
+    parseNumber(data.mandatory_extra_fees_aed) || parseNumber(data.extra_fees);
+
+  await insertCardRecord({
+    card_category: normalizeText(data.card_category),
+    sub_category: normalizeText(data.sub_category),
+    program: normalizeText(data.program),
+    bank_name: normalizeText(data.bank_name),
+    product: normalizeText(data.product),
+    minimum_salary: parseNumber(data.minimum_salary),
+    reward_unit: rewardUnit,
+    unit_value_aed: unitValue,
+    value_metric: valueMetric,
+    value_calculation: valueCalculation,
+    provider: normalizeText(data.provider),
+    annual_fee: parseNumber(data.annual_fee),
+    joining_fee: parseNumber(data.joining_fee),
+    mandatory_extra_fees_aed: mandatoryExtra,
+    extra_fees: normalizeText(data.extra_fees),
+    core_perks: normalizeText(data.core_perks),
+    secondary_perks: normalizeText(data.secondary_perks),
+    extra_perks: normalizeText(data.extra_perks),
+    card_type: normalizeText(data.card_type),
+    current_offer: normalizeText(data.current_offer),
+    product_page: normalizeText(data.product_page),
+    old_notes: normalizeText(data.old_notes),
+    earn_rules_json: normalizeText(data.earn_rules_json),
+  });
+}
+
+async function replaceCardsFromExcelRows(rows) {
+  await dbRun("DELETE FROM cards");
+  await dbRun("DELETE FROM sqlite_sequence WHERE name = 'cards'");
+  for (const entry of rows) {
+    const card = buildCardFromExcelRow(entry);
+    if (!card) {
+      continue;
+    }
+    await insertCardRecord(card);
+  }
+  await backfillCalculationFields();
+  await autoFillEarnRules();
 }
 
 async function updateCardCalculationFields(data) {
@@ -510,6 +552,7 @@ module.exports = {
   insertCard,
   updateCardCalculationFields,
   updateCardsCalculationByFilter,
+  replaceCardsFromExcelRows,
   getSetting,
   setSetting,
   getSettings,

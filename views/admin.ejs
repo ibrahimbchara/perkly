@@ -10,330 +10,34 @@
   <main class="layout admin-layout">
     <header class="hero compact">
       <div class="badge">Admin</div>
-      <h1>Perkly Cards</h1>
-      <p class="lead">Add new cards, manage AI settings, or review the current catalog.</p>
+      <h1>Perkly Card Upload</h1>
+      <p class="lead">Use one Excel template to update all cards at once.</p>
       <a class="link" href="/">Back to matcher</a>
     </header>
 
     <section class="flow">
       <div class="card-block">
-        <h2>Gemini AI settings</h2>
-        <form class="admin-form" method="post" action="/admin/settings">
-          <div class="grid">
-            <div class="input-row">
-              <label>Gemini API Key</label>
-              <input type="password" name="gemini_api_key" placeholder="Leave blank to keep existing" />
-              <small class="hint">
-                <% if (settings.gemini_api_key) { %>
-                  API key saved (ends with <%= settings.gemini_api_key.slice(-4) %>)
-                <% } else { %>
-                  No API key saved yet
-                <% } %>
-              </small>
-            </div>
-            <div class="input-row">
-              <label>Gemini Model</label>
-              <input
-                type="text"
-                name="gemini_model"
-                value="<%= settings.gemini_model %>"
-                placeholder="gemini-1.5-flash"
-              />
-              <small class="hint">Example: gemini-1.5-flash or gemini-1.5-pro</small>
-            </div>
-          </div>
-          <div class="actions">
-            <button class="btn primary" type="submit">Save AI settings</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card-block">
-        <h2>Bulk update calculation fields</h2>
-        <p class="hint">Download the CSV, fill in reward unit, unit value, fees, and earn rules, then upload it.</p>
+        <h2>Download template</h2>
+        <p class="hint">This Excel follows the same structure as your original file, with extra columns for calculation rules.</p>
         <div class="actions">
-          <a class="link" href="/admin/cards/export">Download calculation CSV</a>
+          <a class="link" href="/admin/cards/export-excel">Download current Excel</a>
         </div>
-        <form class="admin-form" method="post" action="/admin/cards/import" enctype="multipart/form-data">
-          <div class="input-row full">
-            <label>Upload CSV</label>
-            <input type="file" name="cards_csv" accept=".csv" required />
-            <small class="hint">Required columns: card_id, reward_unit, unit_value_aed, mandatory_extra_fees_aed, earn_rules_json</small>
-          </div>
-          <div class="actions">
-            <button class="btn primary" type="submit">Upload CSV</button>
-          </div>
-        </form>
-        <p class="hint">Spend buckets used in earn rules: travel, retail, utilities, food_groceries, fuel, transportation, real_estate, foreign.</p>
+        <p class="hint">Add or edit cards directly in the Excel, then upload to replace the database.</p>
       </div>
 
       <div class="card-block">
-        <h2>Excel update (calculation columns)</h2>
-        <p class="hint">Upload an Excel sheet with columns like Reward Unit, Unit Value (AED), Mandatory Extra Fees (AED), Earn Rules JSON.</p>
+        <h2>Upload Excel</h2>
         <form class="admin-form" method="post" action="/admin/cards/import-excel" enctype="multipart/form-data">
           <div class="input-row full">
-            <label>Upload Excel</label>
+            <label>Upload Excel (.xlsx)</label>
             <input type="file" name="cards_excel" accept=".xlsx,.xls" required />
           </div>
           <div class="actions">
-            <button class="btn primary" type="submit">Upload Excel</button>
+            <button class="btn primary" type="submit">Upload and replace cards</button>
           </div>
         </form>
-      </div>
-
-      <div class="card-block">
-        <h2>Rule builder (no JSON)</h2>
-        <p class="hint">Enter earn rates per AED for each bucket. Leave blank to skip a bucket.</p>
-        <form class="admin-form" method="post" action="/admin/cards/rules">
-          <div class="grid">
-            <div class="input-row">
-              <label>Card ID (optional)</label>
-              <input type="number" name="card_id" min="1" placeholder="Use ID to target one card" />
-            </div>
-            <div class="input-row">
-              <label>Card Category (optional)</label>
-              <input type="text" name="card_category" placeholder="Travel" />
-            </div>
-            <div class="input-row">
-              <label>Sub Category (optional)</label>
-              <input type="text" name="sub_category" placeholder="Airline" />
-            </div>
-            <div class="input-row">
-              <label>Program (optional)</label>
-              <input type="text" name="program" placeholder="Emirates" />
-            </div>
-            <div class="input-row">
-              <label>Reward Unit</label>
-              <input type="text" name="reward_unit" placeholder="Skywards Miles" />
-            </div>
-            <div class="input-row">
-              <label>Unit Value (AED per unit)</label>
-              <input type="number" name="unit_value_aed" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Mandatory Extra Fees (AED)</label>
-              <input type="number" name="mandatory_extra_fees_aed" min="0" />
-            </div>
-            <div class="input-row">
-              <label>Default rate (units per AED)</label>
-              <input type="number" name="rate_default" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Travel rate</label>
-              <input type="number" name="rate_travel" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Retail rate</label>
-              <input type="number" name="rate_retail" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Utilities rate</label>
-              <input type="number" name="rate_utilities" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Food and Groceries rate</label>
-              <input type="number" name="rate_food_groceries" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Fuel rate</label>
-              <input type="number" name="rate_fuel" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Transportation rate</label>
-              <input type="number" name="rate_transportation" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Real Estate rate</label>
-              <input type="number" name="rate_real_estate" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Foreign rate</label>
-              <input type="number" name="rate_foreign" min="0" step="0.0001" />
-            </div>
-          </div>
-          <div class="actions">
-            <button class="btn primary" type="submit">Apply rules</button>
-          </div>
-          <p class="hint">If Card ID is set, rules apply only to that card. Otherwise, filters will be used.</p>
-        </form>
-      </div>
-
-      <div class="card-block">
-        <h2>Add a new card</h2>
-        <form class="admin-form" method="post" action="/admin/cards">
-          <div class="grid">
-            <div class="input-row">
-              <label>Card Category</label>
-              <input type="text" name="card_category" required />
-            </div>
-            <div class="input-row">
-              <label>Sub Category</label>
-              <input type="text" name="sub_category" />
-            </div>
-            <div class="input-row">
-              <label>Program / Partner</label>
-              <input type="text" name="program" />
-            </div>
-            <div class="input-row">
-              <label>Bank Name</label>
-              <input type="text" name="bank_name" required />
-            </div>
-            <div class="input-row">
-              <label>Product</label>
-              <input type="text" name="product" required />
-            </div>
-            <div class="input-row">
-              <label>Minimum Salary (AED)</label>
-              <input type="number" name="minimum_salary" min="0" />
-            </div>
-            <div class="input-row">
-              <label>Reward Unit</label>
-              <input type="text" name="reward_unit" placeholder="Skywards Miles" />
-            </div>
-            <div class="input-row">
-              <label>Unit Value (AED per unit)</label>
-              <input type="number" name="unit_value_aed" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Annual Fee (AED)</label>
-              <input type="number" name="annual_fee" min="0" />
-            </div>
-            <div class="input-row">
-              <label>Joining Fee (AED)</label>
-              <input type="number" name="joining_fee" min="0" />
-            </div>
-            <div class="input-row">
-              <label>Mandatory Extra Fees (AED)</label>
-              <input type="number" name="mandatory_extra_fees_aed" min="0" />
-            </div>
-            <div class="input-row">
-              <label>Value Metric</label>
-              <input type="text" name="value_metric" />
-            </div>
-            <div class="input-row">
-              <label>Value Calculation</label>
-              <input type="text" name="value_calculation" />
-            </div>
-            <div class="input-row">
-              <label>Provider</label>
-              <input type="text" name="provider" />
-            </div>
-            <div class="input-row">
-              <label>Card Type</label>
-              <input type="text" name="card_type" />
-            </div>
-            <div class="input-row">
-              <label>Current Offer</label>
-              <input type="text" name="current_offer" />
-            </div>
-            <div class="input-row">
-              <label>Product Page</label>
-              <input type="text" name="product_page" />
-            </div>
-          </div>
-
-          <div class="input-row full">
-            <label>Extra Fees</label>
-            <textarea name="extra_fees" rows="2"></textarea>
-          </div>
-          <div class="input-row full">
-            <label>Earn Rules JSON</label>
-            <textarea
-              name="earn_rules_json"
-              rows="4"
-              placeholder='[{"bucket":"travel","units_per_aed":0.4},{"bucket":"food_groceries","units_per_aed":0.1},{"bucket":"default","units_per_aed":0.2}]'
-            ></textarea>
-          </div>
-          <div class="input-row full">
-            <label>Core Perks</label>
-            <textarea name="core_perks" rows="4"></textarea>
-          </div>
-          <div class="input-row full">
-            <label>Secondary Perks</label>
-            <textarea name="secondary_perks" rows="4"></textarea>
-          </div>
-          <div class="input-row full">
-            <label>Extra Perks</label>
-            <textarea name="extra_perks" rows="4"></textarea>
-          </div>
-          <div class="input-row full">
-            <label>Old Notes</label>
-            <textarea name="old_notes" rows="3"></textarea>
-          </div>
-
-          <div class="actions">
-            <button class="btn primary" type="submit">Add card</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card-block">
-        <h2>Update card calculation fields</h2>
-        <form class="admin-form" method="post" action="/admin/cards/update">
-          <div class="grid">
-            <div class="input-row">
-              <label>Card ID</label>
-              <input type="number" name="card_id" min="1" required />
-            </div>
-            <div class="input-row">
-              <label>Reward Unit</label>
-              <input type="text" name="reward_unit" placeholder="Skywards Miles" />
-            </div>
-            <div class="input-row">
-              <label>Unit Value (AED per unit)</label>
-              <input type="number" name="unit_value_aed" min="0" step="0.0001" />
-            </div>
-            <div class="input-row">
-              <label>Mandatory Extra Fees (AED)</label>
-              <input type="number" name="mandatory_extra_fees_aed" min="0" />
-            </div>
-          </div>
-          <div class="input-row full">
-            <label>Earn Rules JSON</label>
-            <textarea
-              name="earn_rules_json"
-              rows="4"
-              placeholder='[{"bucket":"travel","units_per_aed":0.4},{"bucket":"food_groceries","units_per_aed":0.1},{"bucket":"default","units_per_aed":0.2}]'
-            ></textarea>
-          </div>
-          <div class="actions">
-            <button class="btn primary" type="submit">Update card</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card-block">
-        <h2>Current catalog (<%= cards.length %>)</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Category</th>
-                <th>Sub</th>
-                <th>Program</th>
-                <th>Bank</th>
-                <th>Product</th>
-                <th>Min Salary</th>
-                <th>Annual Fee</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% cards.forEach(function(card) { %>
-              <tr>
-                <td><%= card.id %></td>
-                <td><%= card.card_category %></td>
-                <td><%= card.sub_category %></td>
-                <td><%= card.program %></td>
-                <td><%= card.bank_name %></td>
-                <td><%= card.product %></td>
-                <td><%= card.minimum_salary %></td>
-                <td><%= card.annual_fee %></td>
-              </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+        <p class="hint">Upload replaces the full card database. Keep column names unchanged.</p>
+        <p class="hint">Spend buckets used in Earn Rules JSON: travel, retail, utilities, food_groceries, fuel, transportation, real_estate, foreign.</p>
       </div>
     </section>
   </main>
