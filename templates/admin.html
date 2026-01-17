@@ -1,0 +1,142 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perkly Admin</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="layout admin-layout">
+    <header class="hero compact">
+      <div class="badge">Admin</div>
+      <h1>Perkly Cards</h1>
+      <p class="lead">Add new cards or review the current catalog.</p>
+      <a class="link" href="/">Back to matcher</a>
+    </header>
+
+    <section class="flow">
+      <div class="card-block">
+        <h2>Add a new card</h2>
+        <form class="admin-form" method="post" action="/admin/cards">
+          <div class="grid">
+            <div class="input-row">
+              <label>Card Category</label>
+              <input type="text" name="card_category" required />
+            </div>
+            <div class="input-row">
+              <label>Sub Category</label>
+              <input type="text" name="sub_category" />
+            </div>
+            <div class="input-row">
+              <label>Program / Partner</label>
+              <input type="text" name="program" />
+            </div>
+            <div class="input-row">
+              <label>Bank Name</label>
+              <input type="text" name="bank_name" required />
+            </div>
+            <div class="input-row">
+              <label>Product</label>
+              <input type="text" name="product" required />
+            </div>
+            <div class="input-row">
+              <label>Minimum Salary (AED)</label>
+              <input type="number" name="minimum_salary" min="0" />
+            </div>
+            <div class="input-row">
+              <label>Annual Fee (AED)</label>
+              <input type="number" name="annual_fee" min="0" />
+            </div>
+            <div class="input-row">
+              <label>Joining Fee (AED)</label>
+              <input type="number" name="joining_fee" min="0" />
+            </div>
+            <div class="input-row">
+              <label>Value Metric</label>
+              <input type="text" name="value_metric" />
+            </div>
+            <div class="input-row">
+              <label>Value Calculation</label>
+              <input type="text" name="value_calculation" />
+            </div>
+            <div class="input-row">
+              <label>Provider</label>
+              <input type="text" name="provider" />
+            </div>
+            <div class="input-row">
+              <label>Card Type</label>
+              <input type="text" name="card_type" />
+            </div>
+            <div class="input-row">
+              <label>Current Offer</label>
+              <input type="text" name="current_offer" />
+            </div>
+            <div class="input-row">
+              <label>Product Page</label>
+              <input type="text" name="product_page" />
+            </div>
+          </div>
+
+          <div class="input-row full">
+            <label>Extra Fees</label>
+            <textarea name="extra_fees" rows="2"></textarea>
+          </div>
+          <div class="input-row full">
+            <label>Core Perks</label>
+            <textarea name="core_perks" rows="4"></textarea>
+          </div>
+          <div class="input-row full">
+            <label>Secondary Perks</label>
+            <textarea name="secondary_perks" rows="4"></textarea>
+          </div>
+          <div class="input-row full">
+            <label>Extra Perks</label>
+            <textarea name="extra_perks" rows="4"></textarea>
+          </div>
+          <div class="input-row full">
+            <label>Old Notes</label>
+            <textarea name="old_notes" rows="3"></textarea>
+          </div>
+
+          <div class="actions">
+            <button class="btn primary" type="submit">Add card</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card-block">
+        <h2>Current catalog ({{ cards | length }})</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Sub</th>
+                <th>Program</th>
+                <th>Bank</th>
+                <th>Product</th>
+                <th>Min Salary</th>
+                <th>Annual Fee</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for card in cards %}
+              <tr>
+                <td>{{ card['card_category'] }}</td>
+                <td>{{ card['sub_category'] }}</td>
+                <td>{{ card['program'] }}</td>
+                <td>{{ card['bank_name'] }}</td>
+                <td>{{ card['product'] }}</td>
+                <td>{{ card['minimum_salary'] }}</td>
+                <td>{{ card['annual_fee'] }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
